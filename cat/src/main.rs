@@ -31,15 +31,10 @@ fn run(_args: Args) -> Result<()> {
     let mut read_files = Vec::new();
 
     for file in &_args.files {
-        // TODO: Error from each file
         let lines = match file.as_str() {
-            "-" => {
-                read_from_stdin()
-            }
-            _ => {
-                read_from_file(file)
-            }
-        }.expect("TODO: panic message");
+            "-" => read_from_stdin(),
+            _ => read_from_file(file),
+        }?;
         read_files.push(lines);
     }
 
@@ -77,7 +72,9 @@ fn read_from_stdin() -> Result<Vec<String>> {
 fn read_from_file(file: &String) -> Result<Vec<String>> {
     let mut lines = Vec::new();
 
-    let file = File::open(file)?;
+    let file = File::open(file).unwrap_or_else(|error| {
+        panic!("Failed to open {file}: {error}");
+    });
     let reader = io::BufReader::new(file);
 
     let input = reader.lines();
