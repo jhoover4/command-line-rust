@@ -12,7 +12,7 @@ struct Args {
     #[arg(value_name = "FILE", default_value = "-")]
     files: Vec<String>,
     /// Number lines
-    #[arg(short('n'), long, conflicts_with("number_nonblank_lines"))]
+    #[arg(short('n'), long("number"), conflicts_with("number_nonblank_lines"))]
     number_lines: bool,
     /// Number non-blank lines
     #[arg(short('b'), long("number-nonblank"))]
@@ -47,15 +47,15 @@ fn run(_args: Args) -> Result<()> {
         let mut n = 1;
         for line in file {
             if _args.number_lines {
+                println!("{:>6}\t{}", n, line);
+                n += 1;
+            } else if _args.number_nonblank_lines {
                 if line != "" {
                     println!("{:>6}\t{}", n, line);
                     n += 1;
                 } else {
-                    println!("{:>6}", line);
+                    println!();
                 }
-            } else if _args.number_nonblank_lines {
-                println!("{:>6}\t{}", n, line);
-                n += 1;
             } else {
                 println!("{}", line);
             }
