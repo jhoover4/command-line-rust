@@ -48,13 +48,13 @@ fn run(_args: Args) -> Result<()> {
         for line in file {
             if _args.number_lines {
                 if line != "" {
-                    println!("{:>6} {}", n, line);
+                    println!("{:>6}\t{}", n, line);
                     n += 1;
                 } else {
                     println!("{:>6}", line);
                 }
             } else if _args.number_nonblank_lines {
-                println!("{:>6} {}", n, line);
+                println!("{:>6}\t{}", n, line);
                 n += 1;
             } else {
                 println!("{}", line);
