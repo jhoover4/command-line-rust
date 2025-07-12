@@ -2,7 +2,8 @@ use anyhow::Result;
 use assert_cmd::Command;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
-use rand::{distributions::Alphanumeric, Rng};
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use std::fs;
 
 const PRG: &str = "cat";
@@ -26,10 +27,10 @@ fn usage() -> Result<()> {
 // --------------------------------------------------
 fn gen_bad_file() -> String {
     loop {
-        let filename: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(7)
+        let filename: String = std::iter::repeat(())
+            .map(|()| rng().sample(Alphanumeric))
             .map(char::from)
+            .take(7)
             .collect();
 
         if fs::metadata(&filename).is_err() {
@@ -46,7 +47,7 @@ fn skips_bad_file() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg(&bad)
         .assert()
-        .success()
+        .failure()
         .stderr(predicate::str::is_match(expected)?);
     Ok(())
 }
@@ -64,11 +65,7 @@ fn run(args: &[&str], expected_file: &str) -> Result<()> {
 }
 
 // --------------------------------------------------
-fn run_stdin(
-    input_file: &str,
-    args: &[&str],
-    expected_file: &str,
-) -> Result<()> {
+fn run_stdin(input_file: &str, args: &[&str], expected_file: &str) -> Result<()> {
     let input = fs::read_to_string(input_file)?;
     let expected = fs::read_to_string(expected_file)?;
     let output = Command::cargo_bin(PRG)?

@@ -2,7 +2,8 @@ use anyhow::Result;
 use assert_cmd::Command;
 use predicates::prelude::*;
 use pretty_assertions::assert_eq;
-use rand::{distributions::Alphanumeric, Rng};
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use std::fs::{self, File};
 use std::io::prelude::*;
 
@@ -15,10 +16,10 @@ const TWELVE: &str = "./tests/inputs/twelve.txt";
 
 // --------------------------------------------------
 fn random_string() -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(7)
+    std::iter::repeat(())
+        .map(|()| rng().sample(Alphanumeric))
         .map(char::from)
+        .take(7)
         .collect()
 }
 
@@ -111,11 +112,7 @@ fn run(args: &[&str], expected_file: &str) -> Result<()> {
 }
 
 // --------------------------------------------------
-fn run_stdin(
-    args: &[&str],
-    input_file: &str,
-    expected_file: &str,
-) -> Result<()> {
+fn run_stdin(args: &[&str], input_file: &str, expected_file: &str) -> Result<()> {
     // Extra work here due to lossy UTF
     let mut file = File::open(expected_file)?;
     let mut buffer = Vec::new();
