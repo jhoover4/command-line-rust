@@ -4,8 +4,8 @@ resolver = "2"
 members = ["head", "cat"]
 
 [workspace.dependencies]
-anyhow = "1.0.93"
-clap = { version = "4.5.20", features = ["derive"] }
+anyhow = "1.0.98"
+clap = { version = "4.5.41", features = ["derive"] }
 assert_cmd = "2.0.17"
 predicates = "3.1.3"
 pretty_assertions = "1.4.1"
