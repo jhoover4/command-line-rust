@@ -1,14 +1,13 @@
 [package]
 name = "head"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
-anyhow = "1.0.93"
-clap = { version = "4.5.20", features = ["derive"] }
+anyhow = { workspace = true }
+clap = { workspace = true }
 
 [dev-dependencies]
-assert_cmd = "2.0.16"
-predicates = "3.1.2"
-pretty_assertions = "1.4.1"
-rand = "0.8.5"
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+pretty_assertions = { workspace = true }
+rand = { workspace = true }
