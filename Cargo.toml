@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 
-members = ["head", "cat"]
+members = ["head", "cat", "wc"]
 
 [workspace.dependencies]
 anyhow = "1.0.98"
