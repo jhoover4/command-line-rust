@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 use rand::{distributions::Alphanumeric, Rng};
 use std::fs;
 
-const PRG: &str = "wcr";
+const PRG: &str = "wc";
 const EMPTY: &str = "tests/inputs/empty.txt";
 const FOX: &str = "tests/inputs/fox.txt";
 const ATLAMAL: &str = "tests/inputs/atlamal.txt";
