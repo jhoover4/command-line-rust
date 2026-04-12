@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::ops::{AddAssign};
 
-#[allow(dead_code)]
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
