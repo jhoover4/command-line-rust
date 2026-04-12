@@ -45,7 +45,7 @@ fn run(_args: Args) -> Result<()> {
                 println!("{:>6}\t{}", n, line);
                 n += 1;
             } else if _args.number_nonblank_lines {
-                if line != "" {
+                if !line.is_empty() {
                     println!("{:>6}\t{}", n, line);
                     n += 1;
                 } else {

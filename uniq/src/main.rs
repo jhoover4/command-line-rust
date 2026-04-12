@@ -30,10 +30,10 @@ fn main() {
 fn run(args: Args) -> Result<()> {
     let file = open(&args.in_file).map_err(|e| anyhow!("{}: {e}", args.in_file))?;
 
-    let mut lines = BufReader::new(file).lines().map(|l| l.unwrap_or_default());
+    let lines = BufReader::new(file).lines().map(|l| l.unwrap_or_default());
     let mut uniq_values_with_count: Vec<(i32, String)> = Vec::new();
 
-    while let Some(curr_str) = lines.next() {
+    for curr_str in lines {
         match uniq_values_with_count.pop() {
             Some((prev_count, prev_str)) => {
                 let curr_count = {

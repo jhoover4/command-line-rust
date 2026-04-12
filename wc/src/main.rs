@@ -69,7 +69,7 @@ fn run(args: Args) -> Result<()> {
             Err(err) => eprintln!("{filename}: {err}"),
             Ok(file) => {
                 let info = count(file)?;
-                total += info.clone();
+                total += info;
 
                 print_count(info, &args);
                 if filename != "-" {
