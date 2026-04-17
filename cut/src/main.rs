@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use clap;
 use clap::{Args, Parser};
 use regex::Regex;
-use std::ops::Range;
+use std::ops::{Range, RangeFrom};
 type PositionList = Vec<Range<usize>>;
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -40,7 +40,7 @@ fn is_byte(delim_str: &str) -> Result<char, String> {
     if delim_chars.clone().count() != 1 {
         return Err(delim_err);
     }
-    let delim = delim_chars.next().ok_or(Err(delim_err))?;
+    let delim = delim_chars.next().ok_or(&delim_err)?;
 
     if delim.is_ascii() {
         Ok(delim)
@@ -50,19 +50,29 @@ fn is_byte(delim_str: &str) -> Result<char, String> {
 }
 
 fn parse_pos(range: &str) -> Result<PositionList, String> {
-    let parse_pos_err = format!("illegal list value: {range}");
+    let parse_pos_err = format!("illegal list value: \"{range}\"");
 
-    let chars = range.chars();
-
-    if chars.clone().count() > 3 {
+    let re = Regex::new(r"\d\-\d").map_err(|_| &parse_pos_err)?;
+    if !re.is_match(range) {
         return Err(parse_pos_err);
     }
 
-    let digits = chars.clone().map(|c| c.to_digit(10).ok_or(parse_pos_err)).collect::<Vec<_>>();
+    let mut chars = range.chars();
+    let start = chars
+        .next()
+        .ok_or(&parse_pos_err)?
+        .to_digit(10)
+        .ok_or(&parse_pos_err)? as usize;
+    let _ = chars.next().ok_or(&parse_pos_err)?;
+    let end = chars
+        .next()
+        .ok_or(&parse_pos_err)?
+        .to_digit(10)
+        .ok_or(&parse_pos_err)? as usize;
 
-    let a = vec![Range::from(digits)];
+    let range = std::ops::Range { start, end };
 
-    Ok(a)
+    Ok(vec![range])
 }
 
 fn main() {
@@ -83,118 +93,181 @@ mod unit_tests {
     use super::parse_pos;
 
     #[test]
-    fn test_parse_pos() {
+    fn test_parse_pos_string_empty() {
         // The empty string is an error
         assert!(parse_pos("").is_err());
+    }
 
-        // Zero is an error
+    #[test]
+    fn test_parse_pos_string_zero_error() {
         let res = parse_pos("0");
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "0""#);
+    }
 
+    #[test]
+    fn test_parse_pos_string_zero_one_error() {
         let res = parse_pos("0-1");
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "0""#);
+    }
 
-        // A leading "+" is an error
+    #[test]
+    fn test_parse_pos_string_leading_plus_error() {
         let res = parse_pos("+1");
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "+1""#,);
+    }
 
+    #[test]
+    fn test_parse_pos_leading_plus_range_error() {
         let res = parse_pos("+1-2");
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err().to_string(),
             r#"illegal list value: "+1-2""#,
         );
+    }
 
+    #[test]
+    fn test_parse_pos_trailing_plus_range_error() {
         let res = parse_pos("1-+2");
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err().to_string(),
             r#"illegal list value: "1-+2""#,
         );
+    }
 
-        // Any non-number is an error
+    #[test]
+    fn test_parse_pos_alpha_error() {
         let res = parse_pos("a");
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "a""#);
+    }
 
+    #[test]
+    fn test_parse_pos_alpha_in_list_error() {
         let res = parse_pos("1,a");
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "a""#);
+    }
 
+    #[test]
+    fn test_parse_pos_alpha_range_end_error() {
         let res = parse_pos("1-a");
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "1-a""#,);
+        assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "1-a""#);
+    }
 
+    #[test]
+    fn test_parse_pos_alpha_range_start_error() {
         let res = parse_pos("a-1");
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "a-1""#,);
+        assert_eq!(res.unwrap_err().to_string(), r#"illegal list value: "a-1""#);
+    }
 
-        // Wonky ranges
-        let res = parse_pos("-");
-        assert!(res.is_err());
+    #[test]
+    fn test_parse_pos_dash_only_error() {
+        assert!(parse_pos("-").is_err());
+    }
 
-        let res = parse_pos(",");
-        assert!(res.is_err());
+    #[test]
+    fn test_parse_pos_comma_only_error() {
+        assert!(parse_pos(",").is_err());
+    }
 
-        let res = parse_pos("1,");
-        assert!(res.is_err());
+    #[test]
+    fn test_parse_pos_trailing_comma_error() {
+        assert!(parse_pos("1,").is_err());
+    }
 
-        let res = parse_pos("1-");
-        assert!(res.is_err());
+    #[test]
+    fn test_parse_pos_trailing_dash_error() {
+        assert!(parse_pos("1-").is_err());
+    }
 
-        let res = parse_pos("1-1-1");
-        assert!(res.is_err());
+    #[test]
+    fn test_parse_pos_triple_range_error() {
+        assert!(parse_pos("1-1-1").is_err());
+    }
 
-        let res = parse_pos("1-1-a");
-        assert!(res.is_err());
+    #[test]
+    fn test_parse_pos_triple_range_alpha_error() {
+        assert!(parse_pos("1-1-a").is_err());
+    }
 
-        // First number must be less than second
+    #[test]
+    fn test_parse_pos_equal_range_error() {
         let res = parse_pos("1-1");
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err().to_string(),
             "First number in range (1) must be lower than second number (1)"
         );
+    }
 
+    #[test]
+    fn test_parse_pos_inverted_range_error() {
         let res = parse_pos("2-1");
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err().to_string(),
             "First number in range (2) must be lower than second number (1)"
         );
+    }
 
-        // All the following are acceptable
+    #[test]
+    fn test_parse_pos_single_number() {
         let res = parse_pos("1");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..1]);
+    }
 
+    #[test]
+    fn test_parse_pos_single_number_with_leading_zero() {
         let res = parse_pos("01");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..1]);
+    }
 
+    #[test]
+    fn test_parse_pos_list() {
         let res = parse_pos("1,3");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..1, 2..3]);
+    }
 
+    #[test]
+    fn test_parse_pos_list_with_leading_zeros() {
         let res = parse_pos("001,0003");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..1, 2..3]);
+    }
 
+    #[test]
+    fn test_parse_pos_range() {
         let res = parse_pos("1-3");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..3]);
+    }
 
+    #[test]
+    fn test_parse_pos_range_with_leading_zeros() {
         let res = parse_pos("0001-03");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..3]);
+    }
 
+    #[test]
+    fn test_parse_pos_mixed_list_and_range() {
         let res = parse_pos("1,7,3-5");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![0..1, 6..7, 2..5]);
+    }
 
+    #[test]
+    fn test_parse_pos_large_values() {
         let res = parse_pos("15,19-20");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![14..15, 18..20]);
