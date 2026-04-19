@@ -6,6 +6,7 @@ use clap;
 use clap::{Args, Parser};
 use regex::Regex;
 use std::ops::{Range, RangeFrom};
+
 type PositionList = Vec<Range<usize>>;
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -50,29 +51,69 @@ fn is_byte(delim_str: &str) -> Result<char, String> {
 }
 
 fn parse_pos(range: &str) -> Result<PositionList, String> {
-    let parse_pos_err = format!("illegal list value: \"{range}\"");
+    // TODO: Need to fail with input: "1,a"
+    // TODO: Need to fail with input: "+1"
+    // TODO: Need to fail with input: "0-1"
+    // TODO: Need to fail with input: "1-+2"
+    // TODO: Need to fail with input: "+1-2"
 
-    let re = Regex::new(r"\d\-\d").map_err(|_| &parse_pos_err)?;
-    if !re.is_match(range) {
-        return Err(parse_pos_err);
+    let parse_err_str = &format!("illegal list value: \"{}\"", range.to_string());
+
+    if range.is_empty() {
+        return Err(parse_err_str.to_string());
     }
 
-    let mut chars = range.chars();
-    let start = chars
-        .next()
-        .ok_or(&parse_pos_err)?
-        .to_digit(10)
-        .ok_or(&parse_pos_err)? as usize;
-    let _ = chars.next().ok_or(&parse_pos_err)?;
-    let end = chars
-        .next()
-        .ok_or(&parse_pos_err)?
-        .to_digit(10)
-        .ok_or(&parse_pos_err)? as usize;
+    // Parse comma-separated values, each can be a single number or a range
+    range.split(',').try_fold(Vec::new(), |mut acc, part| {
+        if part.is_empty() {
+            return Err(parse_err_str.to_string());
+        }
 
-    let range = std::ops::Range { start, end };
+        // Check if this part is a range (contains dash)
+        if let Some(dash_pos) = part.find('-') {
+            // Make sure the dash is not at the start or end
+            if dash_pos == 0 || dash_pos == part.len() - 1 {
+                return Err(parse_err_str.to_string());
+            }
 
-    Ok(vec![range])
+            // Split on first dash only
+            let (start_str, end_str) = part.split_at(dash_pos);
+            let end_str = &end_str[1..]; // Skip the dash
+
+            // Parse start and end
+            let start = start_str
+                .parse::<usize>()
+                .map_err(|_| parse_err_str.to_string())?;
+            let end = end_str
+                .parse::<usize>()
+                .map_err(|_| parse_err_str.to_string())?;
+
+            // Validate: start must be > 0 and start < end
+            if start == 0 {
+                return Err(parse_err_str.to_string());
+            }
+            if start >= end {
+                return Err(format!(
+                    "First number in range ({start}) must be lower than second number ({end})",
+                ));
+            }
+
+            // Add range: convert 1-based to 0-based
+            acc.push((start - 1)..end);
+        } else {
+            // Single number
+            let num = part.parse::<usize>().map_err(|_| parse_err_str.to_string())?;
+
+            if num == 0 {
+                return Err(parse_err_str.to_string());
+            }
+
+            // Add single position: convert 1-based to 0-based
+            acc.push((num - 1)..num);
+        }
+
+        Ok(acc)
+    })
 }
 
 fn main() {
