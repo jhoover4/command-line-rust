@@ -51,15 +51,12 @@ fn is_byte(delim_str: &str) -> Result<char, String> {
 }
 
 fn parse_pos(range: &str) -> Result<PositionList, String> {
-    // TODO: Need to fail with input: "1,a"
-    // TODO: Need to fail with input: "+1"
-    // TODO: Need to fail with input: "0-1"
-    // TODO: Need to fail with input: "1-+2"
-    // TODO: Need to fail with input: "+1-2"
-
     let parse_err_str = &format!("illegal list value: \"{}\"", range.to_string());
 
     if range.is_empty() {
+        return Err(parse_err_str.to_string());
+    }
+    if !range.starts_with(|c: char| c.is_digit(10)) {
         return Err(parse_err_str.to_string());
     }
 
@@ -80,6 +77,10 @@ fn parse_pos(range: &str) -> Result<PositionList, String> {
             let (start_str, end_str) = part.split_at(dash_pos);
             let end_str = &end_str[1..]; // Skip the dash
 
+            if start_str.contains("+") || end_str.contains("+") {
+                return Err(parse_err_str.to_string());
+            }
+
             // Parse start and end
             let start = start_str
                 .parse::<usize>()
@@ -90,7 +91,7 @@ fn parse_pos(range: &str) -> Result<PositionList, String> {
 
             // Validate: start must be > 0 and start < end
             if start == 0 {
-                return Err(parse_err_str.to_string());
+                return Err(format!("illegal list value: \"{start}\""));
             }
             if start >= end {
                 return Err(format!(
@@ -102,7 +103,9 @@ fn parse_pos(range: &str) -> Result<PositionList, String> {
             acc.push((start - 1)..end);
         } else {
             // Single number
-            let num = part.parse::<usize>().map_err(|_| parse_err_str.to_string())?;
+            let num = part
+                .parse::<usize>()
+                .map_err(|_| format!("illegal list value: \"{part}\""))?;
 
             if num == 0 {
                 return Err(parse_err_str.to_string());
@@ -173,6 +176,8 @@ mod unit_tests {
     #[test]
     fn test_parse_pos_trailing_plus_range_error() {
         let res = parse_pos("1-+2");
+        dbg!(&res);
+
         assert!(res.is_err());
         assert_eq!(
             res.unwrap_err().to_string(),
