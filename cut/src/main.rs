@@ -1,6 +1,4 @@
 #![allow(dead_code, unused)]
-extern crate core;
-
 use anyhow::{anyhow, Result};
 use clap;
 use clap::{Args, Parser};
@@ -26,15 +24,15 @@ struct Cli {
 #[group(required = true, multiple = false)]
 struct Input {
     #[arg(short, long, value_parser=parse_pos)]
-    fields: PositionList,
+    fields: Option<PositionList>,
     #[arg(short, long, value_parser=parse_pos)]
-    bytes: PositionList,
+    bytes: Option<PositionList>,
     #[arg(short, long, value_parser=parse_pos)]
-    chars: PositionList,
+    chars: Option<PositionList>,
 }
 
 /// Checks if value is specifically one byte
-fn is_byte(delim_str: &str) -> Result<char, String> {
+fn is_byte(delim_str: &str) -> Result<String, String> {
     let delim_err = format!("--delim \"{delim_str}\" must be a single byte");
 
     let mut delim_chars = delim_str.chars();
@@ -44,7 +42,7 @@ fn is_byte(delim_str: &str) -> Result<char, String> {
     let delim = delim_chars.next().ok_or(&delim_err)?;
 
     if delim.is_ascii() {
-        Ok(delim)
+        Ok(delim.to_string())
     } else {
         Err(delim_err)
     }
