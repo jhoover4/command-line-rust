@@ -7,7 +7,6 @@ edition = "2021"
 anyhow = { workspace = true }
 clap = { workspace = true }
 csv = { workspace = true }
-regex = { workspace = true }
 
 [dev-dependencies]
 assert_cmd = { workspace = true }

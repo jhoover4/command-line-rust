@@ -1,9 +1,17 @@
-#![allow(dead_code, unused)]
-use anyhow::{anyhow, Result};
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
+use anyhow::{anyhow, bail, Result};
 use clap;
 use clap::{Args, Parser};
-use regex::Regex;
-use std::ops::{Range, RangeFrom};
+use csv::StringRecord;
+use std::io::Read;
+use std::{
+    fs::File,
+    io::{self, BufRead, BufReader},
+    ops::Range,
+};
 
 type PositionList = Vec<Range<usize>>;
 #[derive(Parser, Debug)]
@@ -29,6 +37,14 @@ struct Input {
     bytes: Option<PositionList>,
     #[arg(short, long, value_parser=parse_pos)]
     chars: Option<PositionList>,
+}
+
+fn main() {
+    let args = Cli::parse();
+    if let Err(e) = run(args) {
+        eprintln!("{e}");
+        std::process::exit(1);
+    }
 }
 
 /// Checks if value is specifically one byte
@@ -117,22 +133,89 @@ fn parse_pos(range: &str) -> Result<PositionList, String> {
     })
 }
 
-fn main() {
-    let args = Cli::parse();
-    if let Err(e) = run(args) {
-        eprintln!("{e}");
-        std::process::exit(1);
+fn run(args: Cli) -> Result<()> {
+    for filename in &args.files {
+        match open(filename) {
+            Err(err) => eprintln!("{filename}: {err}"),
+            Ok(reader) => {
+                for l in reader.lines() {
+                    let line = l?;
+
+                    let output = if let Some(pos_list) = &args.input.bytes {
+                        extract_bytes(&line, pos_list)
+                    } else if let Some(pos_list) = &args.input.chars {
+                        extract_chars(&line, pos_list)
+                    } else if let Some(pos_list) = &args.input.fields {
+                        // TODO: Turn line into StringRecord
+                        // extract_fields(&line, pos_list)
+                        line
+                    } else {
+                        bail!("No position list found")
+                    };
+
+                    println!("{output}");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn open(filename: &str) -> Result<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
     }
 }
 
-fn run(args: Cli) -> Result<()> {
-    dbg!(args);
-    Ok(())
+fn extract_chars(line: &str, char_pos: &[Range<usize>]) -> String {
+    let mut extracted = String::new();
+
+    // TODO: Get this working for exclusive range
+    for range in char_pos {
+        let s: String = line
+            .char_indices()
+            .filter_map(|(i, c)| if range.contains(&i) { Some(c) } else { None })
+            .collect();
+
+        extracted.push_str(&s);
+    }
+
+    extracted
+}
+
+fn extract_bytes(line: &str, byte_pos: &[Range<usize>]) -> String {
+    let mut extracted: Vec<u8> = Vec::new();
+
+    for range in byte_pos {
+        let mut bytes: Vec<u8> = line
+            .as_bytes()
+            .into_iter()
+            .enumerate()
+            .filter_map(|e| {
+                if range.contains(&e.0) {
+                    Some(e.1.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        extracted.append(&mut bytes);
+    }
+
+    String::from_utf8(extracted).unwrap_or_else(|_| "�".to_string())
+}
+
+fn extract_fields(record: &StringRecord, field_pos: &[Range<usize>]) -> Vec<String> {
+    unimplemented!();
 }
 
 #[cfg(test)]
 mod unit_tests {
-    use super::parse_pos;
+    use super::{extract_bytes, extract_chars, extract_fields, parse_pos};
+    use csv::StringRecord;
 
     #[test]
     fn test_parse_pos_string_empty() {
@@ -315,5 +398,35 @@ mod unit_tests {
         let res = parse_pos("15,19-20");
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), vec![14..15, 18..20]);
+    }
+
+    #[test]
+    fn test_extract_chars() {
+        assert_eq!(extract_chars("", &[0..1]), "".to_string());
+        assert_eq!(extract_chars("ábc", &[0..1]), "á".to_string());
+        assert_eq!(extract_chars("ábc", &[0..1, 2..3]), "ác".to_string());
+        assert_eq!(extract_chars("ábc", &[0..3]), "ábc".to_string());
+        assert_eq!(extract_chars("ábc", &[2..3, 1..2]), "cb".to_string());
+        assert_eq!(extract_chars("ábc", &[0..1, 1..2, 4..5]), "áb".to_string());
+    }
+
+    #[test]
+    fn test_extract_bytes() {
+        assert_eq!(extract_bytes("ábc", &[0..1]), "�".to_string());
+        assert_eq!(extract_bytes("ábc", &[0..2]), "á".to_string());
+        assert_eq!(extract_bytes("ábc", &[0..3]), "áb".to_string());
+        assert_eq!(extract_bytes("ábc", &[0..4]), "ábc".to_string());
+        assert_eq!(extract_bytes("ábc", &[3..4, 2..3]), "cb".to_string());
+        assert_eq!(extract_bytes("ábc", &[0..2, 5..6]), "á".to_string());
+    }
+
+    #[test]
+    fn test_extract_fields() {
+        let rec = StringRecord::from(vec!["Captain", "Sham", "12345"]);
+        assert_eq!(extract_fields(&rec, &[0..1]), &["Captain"]);
+        assert_eq!(extract_fields(&rec, &[1..2]), &["Sham"]);
+        assert_eq!(extract_fields(&rec, &[0..1, 2..3]), &["Captain", "12345"]);
+        assert_eq!(extract_fields(&rec, &[0..1, 3..4]), &["Captain"]);
+        assert_eq!(extract_fields(&rec, &[1..2, 0..1]), &["Sham", "Captain"]);
     }
 }
