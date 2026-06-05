@@ -146,9 +146,14 @@ fn run(args: Cli) -> Result<()> {
                     } else if let Some(pos_list) = &args.input.chars {
                         extract_chars(&line, pos_list)
                     } else if let Some(pos_list) = &args.input.fields {
-                        // TODO: Turn line into StringRecord
-                        // extract_fields(&line, pos_list)
-                        line
+                        let mut s = String::new();
+                        let mut rdr = csv::Reader::from_reader(line.as_bytes());
+                        for result in rdr.records() {
+                            let record = result?;
+                            let fields = extract_fields(&record, pos_list);
+                            s.push_str(&fields.join(" "));
+                        }
+                        s
                     } else {
                         bail!("No position list found")
                     };
@@ -209,7 +214,24 @@ fn extract_bytes(line: &str, byte_pos: &[Range<usize>]) -> String {
 }
 
 fn extract_fields(record: &StringRecord, field_pos: &[Range<usize>]) -> Vec<String> {
-    unimplemented!();
+    let mut fields: Vec<String> = vec![];
+
+    dbg!(record);
+
+    for range in field_pos {
+        let field: String = record
+            .clone()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| if range.contains(&i) { Some(s) } else { None })
+            .collect();
+
+        if !field.is_empty() {
+            fields.push(field);
+        }
+    }
+
+    fields
 }
 
 #[cfg(test)]
