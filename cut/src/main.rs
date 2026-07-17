@@ -1,12 +1,8 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap;
 use clap::{Args, Parser};
 use csv::StringRecord;
-use std::io::Read;
+use std::ops::RangeBounds;
 use std::{
     fs::File,
     io::{self, BufRead, BufReader},
@@ -175,19 +171,12 @@ fn open(filename: &str) -> Result<Box<dyn BufRead>> {
 }
 
 fn extract_chars(line: &str, char_pos: &[Range<usize>]) -> String {
-    let mut extracted = String::new();
-
-    // TODO: Get this working for exclusive range
-    for range in char_pos {
-        let s: String = line
-            .char_indices()
-            .filter_map(|(i, c)| if range.contains(&i) { Some(c) } else { None })
-            .collect();
-
-        extracted.push_str(&s);
-    }
-
-    extracted
+    let chars: Vec<_> = line.chars().collect();
+    char_pos
+        .iter()
+        .cloned()
+        .flat_map(|range| range.filter_map(|i| chars.get(i).copied()))
+        .collect()
 }
 
 fn extract_bytes(line: &str, byte_pos: &[Range<usize>]) -> String {
@@ -215,8 +204,6 @@ fn extract_bytes(line: &str, byte_pos: &[Range<usize>]) -> String {
 
 fn extract_fields(record: &StringRecord, field_pos: &[Range<usize>]) -> Vec<String> {
     let mut fields: Vec<String> = vec![];
-
-    dbg!(record);
 
     for range in field_pos {
         let field: String = record
@@ -279,7 +266,6 @@ mod unit_tests {
     #[test]
     fn test_parse_pos_trailing_plus_range_error() {
         let res = parse_pos("1-+2");
-        dbg!(&res);
 
         assert!(res.is_err());
         assert_eq!(
